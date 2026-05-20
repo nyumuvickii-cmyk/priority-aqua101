@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -8,33 +9,102 @@ import {
   Package, Truck, Home, Star, Share2, Download, QrCode
 } from "lucide-react";
 
-const trackingSteps = [
-  { status: "PENDING", label: "Order Placed", time: "10:30 AM", icon: <Package className="w-5 h-5" />, completed: true },
-  { status: "CONFIRMED", label: "Confirmed", time: "10:35 AM", icon: <Check className="w-5 h-5" />, completed: true },
-  { status: "ASSIGNED", label: "Driver Assigned", time: "10:45 AM", icon: <Truck className="w-5 h-5" />, completed: true },
-  { status: "PICKED_UP", label: "Picked Up", time: "11:00 AM", icon: <Package className="w-5 h-5" />, completed: true },
-  { status: "ON_THE_WAY", label: "On The Way", time: "11:15 AM", icon: <Truck className="w-5 h-5" />, completed: true, active: true },
-  { status: "NEARBY", label: "Nearby", time: "--", icon: <MapPin className="w-5 h-5" />, completed: false },
-  { status: "DELIVERED", label: "Delivered", time: "--", icon: <Home className="w-5 h-5" />, completed: false },
-];
+const statusMeta = {
+  PENDING: { label: "Order Placed", icon: <Package className="w-5 h-5" /> },
+  CONFIRMED: { label: "Confirmed", icon: <Check className="w-5 h-5" /> },
+  ASSIGNED: { label: "Driver Assigned", icon: <Truck className="w-5 h-5" /> },
+  PICKED_UP: { label: "Picked Up", icon: <Package className="w-5 h-5" /> },
+  ON_THE_WAY: { label: "On The Way", icon: <Truck className="w-5 h-5" /> },
+  NEARBY: { label: "Nearby", icon: <MapPin className="w-5 h-5" /> },
+  DELIVERED: { label: "Delivered", icon: <Home className="w-5 h-5" /> },
+};
 
 export default function TrackingPage() {
-  const [driverLocation, setDriverLocation] = useState({ lat: -1.2800, lng: 36.8300 });
-  const [eta, setEta] = useState(12);
-  const [showRating, setShowRating] = useState(false);
-  const [rating, setRating] = useState(0);
+  const searchParams = useSearchParams();
+  const orderNumber = searchParams.get("orderNumber");
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Simulate driver movement
   useEffect(() => {
+    if (!orderNumber) return;
+    setLoading(true);
+    fetch(`/api/orders?orderNumber=${orderNumber}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.orders && data.orders.length > 0) {
+          setOrder(data.orders[0]);
+        } else {
+          setError("Order not found");
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to fetch order");
+        setLoading(false);
+      });
+  }, [orderNumber]);
+
+  // Compute tracking steps from order.tracking
+  const trackingSteps = useMemo(() => {
+    if (!order) return [];
+    const steps = [
+      "PENDING",
+      "CONFIRMED",
+      "ASSIGNED",
+      "PICKED_UP",
+      "ON_THE_WAY",
+      "NEARBY",
+      "DELIVERED",
+    ];
+    let lastCompletedIdx = -1;
+    const statusTimes = {};
+    order.tracking?.forEach(t => {
+      statusTimes[t.status] = t.createdAt;
+      const idx = steps.indexOf(t.status);
+      if (idx > lastCompletedIdx) lastCompletedIdx = idx;
+    });
+    return steps.map((status, i) => ({
+      status,
+      label: statusMeta[status].label,
+      time: statusTimes[status] ? new Date(statusTimes[status]).toLocaleTimeString() : "--",
+      icon: statusMeta[status].icon,
+      completed: i <= lastCompletedIdx,
+      active: i === lastCompletedIdx,
+    }));
+  }, [order]);
+
+  // Driver location from latest tracking with lat/lng, fallback to driver profile
+  const driverLocation = useMemo(() => {
+    if (!order) return { lat: -1.28, lng: 36.83 };
+    const latest = [...(order.tracking || [])].reverse().find(t => t.latitude && t.longitude);
+    if (latest) return { lat: latest.latitude, lng: latest.longitude };
+    if (order.driver && order.driver.currentLat && order.driver.currentLng) {
+      return { lat: order.driver.currentLat, lng: order.driver.currentLng };
+    }
+    return { lat: -1.28, lng: 36.83 };
+  }, [order]);
+
+  // ETA simulation (replace with real ETA if available)
+  const [eta, setEta] = useState(12);
+  useEffect(() => {
+    if (!order) return;
+    setEta(12); // reset ETA on order change
     const interval = setInterval(() => {
-      setDriverLocation(prev => ({
-        lat: prev.lat + 0.0002,
-        lng: prev.lng + 0.0001,
-      }));
       setEta(prev => Math.max(0, prev - 1));
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [order]);
+
+  if (!orderNumber) {
+    return <div className="p-8 text-center">No order number provided.</div>;
+  }
+  if (loading) {
+    return <div className="p-8 text-center">Loading...</div>;
+  }
+  if (error) {
+    return <div className="p-8 text-center text-red-500">{error}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -47,7 +117,7 @@ export default function TrackingPage() {
             </Link>
             <div>
               <h1 className="text-lg font-bold">Track Order</h1>
-              <p className="text-xs text-gray-500">PA-24-7891</p>
+              <p className="text-xs text-gray-500">{order.orderNumber}</p>
             </div>
           </div>
         </div>
@@ -129,23 +199,29 @@ export default function TrackingPage() {
           {/* Driver Info */}
           <div className="p-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-aqua-400 to-ocean-500 flex items-center justify-center text-white font-bold">
-              JK
+              {order.driver?.name ? order.driver.name.split(" ").map(n => n[0]).join("") : "--"}
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-sm">John Kamau</p>
-              <p className="text-xs text-gray-500">Toyota Hilux • KBY 123A</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                <span className="text-xs">4.8 (342 deliveries)</span>
-              </div>
+              <p className="font-semibold text-sm">{order.driver?.name || "No driver assigned"}</p>
+              <p className="text-xs text-gray-500">{order.driver?.vehicleType || ""} {order.driver?.vehiclePlate ? `• ${order.driver.vehiclePlate}` : ""}</p>
+              {order.driver && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                  <span className="text-xs">{order.driver.rating?.toFixed(1) || "-"} ({order.driver.totalDeliveries || 0} deliveries)</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
-              <button className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors">
-                <Phone className="w-5 h-5" />
-              </button>
-              <button className="w-10 h-10 rounded-xl bg-aqua-100 dark:bg-aqua-900/30 text-aqua-600 flex items-center justify-center hover:bg-aqua-200 transition-colors">
-                <MessageSquare className="w-5 h-5" />
-              </button>
+              {order.driver?.phone && (
+                <a href={`tel:${order.driver.phone}`} className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors">
+                  <Phone className="w-5 h-5" />
+                </a>
+              )}
+              {order.driver?.phone && (
+                <a href={`sms:${order.driver.phone}`} className="w-10 h-10 rounded-xl bg-aqua-100 dark:bg-aqua-900/30 text-aqua-600 flex items-center justify-center hover:bg-aqua-200 transition-colors">
+                  <MessageSquare className="w-5 h-5" />
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -198,19 +274,19 @@ export default function TrackingPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Order Number</span>
-              <span className="font-medium">PA-24-7891</span>
+              <span className="font-medium">{order.orderNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Order Date</span>
-              <span className="font-medium">May 19, 2026</span>
+              <span className="font-medium">{new Date(order.createdAt).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Payment Method</span>
-              <span className="font-medium">M-Pesa</span>
+              <span className="font-medium">{order.paymentMethod}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Total Amount</span>
-              <span className="font-bold text-aqua-600">KSh 6,400</span>
+              <span className="font-bold text-aqua-600">KSh {order.total.toLocaleString()}</span>
             </div>
           </div>
 
