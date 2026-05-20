@@ -1,0 +1,547 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== USER & AUTH ==============
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  phone         String?   @unique
+  password      String?
+  name          String?
+  avatar        String?
+  role          UserRole  @default(CUSTOMER)
+  status        UserStatus @default(ACTIVE)
+  emailVerified DateTime?
+  phoneVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  addresses     Address[]
+  orders        Order[]
+  reviews       Review[]
+  referrals     Referral[] @relation("Referrer")
+  referredBy    Referral[] @relation("Referred")
+  loyaltyPoints LoyaltyPoint[]
+  subscriptions Subscription[]
+  notifications Notification[]
+  driverProfile DriverProfile?
+  adminProfile  AdminProfile?
+  chatMessages   ChatMessage[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+// ============== ADDRESSES ==============
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  label       String   // "Home", "Office", "Apartment"
+  street      String
+  building    String?
+  floor       String?
+  city        String   @default("Nairobi")
+  county      String   @default("Nairobi")
+  landmark    String?
+  latitude    Float?
+  longitude   Float?
+  isDefault   Boolean  @default(false)
+  deliveryZone String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@map("addresses")
+}
+
+// ============== PRODUCTS ==============
+model Product {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  category    ProductCategory
+  image       String?
+  price       Float
+  deposit     Float?       // For bottle deposits
+  stock       Int          @default(0)
+  minOrder    Int          @default(1)
+  maxOrder    Int?         @default(10)
+  unit        String       @default("bottle") // bottle, liter, tanker
+  capacity    String?      // "20L", "500L", "5000L"
+  isAvailable Boolean      @default(true)
+  isFeatured  Boolean      @default(false)
+  rating      Float        @default(0)
+  reviewCount Int          @default(0)
+  tags        String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+  reviews     Review[]
+  inventory   Inventory[]
+  subscriptions Subscription[]
+
+  @@map("products")
+}
+
+enum ProductCategory {
+  BOTTLED_WATER
+  WATER_REFILL
+  BULK_TANKER
+  DISPENSER_RENTAL
+  ACCESSORIES
+}
+
+model Inventory {
+  id        String   @id @default(cuid())
+  productId String
+  quantity  Int
+  type      InventoryType
+  notes     String?
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("inventory")
+}
+
+enum InventoryType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  RETURN
+}
+
+// ============== ORDERS ==============
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  userId          String
+  addressId       String
+  driverId        String?
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod
+  deliveryType    DeliveryType  @default(STANDARD)
+  scheduledDate   DateTime?
+  scheduledTime   String?       // "09:00-12:00", "14:00-17:00"
+  subtotal        Float
+  deliveryFee     Float         @default(0)
+  discount        Float         @default(0)
+  depositTotal    Float         @default(0)
+  total           Float
+  notes           String?
+  qrCode          String?
+  isEmergency     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deliveredAt     DateTime?
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id])
+  address         Address       @relation(fields: [addressId], references: [id])
+  driver          DriverProfile? @relation(fields: [driverId], references: [id])
+  items           OrderItem[]
+  payment         Payment?
+  tracking        OrderTracking[]
+  review          Review?
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  ASSIGNED
+  PICKED_UP
+  ON_THE_WAY
+  NEARBY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MPESA
+  AIRTEL_MONEY
+  CARD
+  CASH_ON_DELIVERY
+  WALLET
+}
+
+enum DeliveryType {
+  INSTANT
+  STANDARD
+  SCHEDULED
+  EMERGENCY
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  deposit   Float   @default(0)
+  total     Float
+
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderTracking {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  latitude  Float?
+  longitude Float?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_tracking")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String        @unique
+  method        PaymentMethod
+  amount        Float
+  transactionId String?       // M-Pesa transaction code
+  status        PaymentStatus
+  mpesaReceipt  String?
+  cardLast4     String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ============== DRIVER ==============
+model DriverProfile {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  licenseNumber   String
+  licenseExpiry   DateTime
+  vehicleType     String
+  vehiclePlate    String
+  vehicleCapacity Int           @default(100) // bottles
+  zone            String[]      @default([])
+  rating          Float         @default(0)
+  totalDeliveries Int           @default(0)
+  earnings        Float         @default(0)
+  isOnline        Boolean       @default(false)
+  isAvailable     Boolean       @default(true)
+  currentLat      Float?
+  currentLng      Float?
+  lastLocationAt  DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders          Order[]
+  earningsLog     DriverEarning[]
+  fuelLogs        FuelLog[]
+
+  @@map("driver_profiles")
+}
+
+model DriverEarning {
+  id          String   @id @default(cuid())
+  driverId    String
+  orderId     String?
+  amount      Float
+  type        EarningType
+  description String?
+  createdAt   DateTime @default(now())
+
+  driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_earnings")
+}
+
+enum EarningType {
+  DELIVERY_FEE
+  BONUS
+  TIP
+  PENALTY
+  WITHDRAWAL
+}
+
+model FuelLog {
+  id          String   @id @default(cuid())
+  driverId    String
+  liters      Float
+  amount      Float
+  mileage     Float
+  station     String?
+  createdAt   DateTime @default(now())
+
+  driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("fuel_logs")
+}
+
+// ============== REVIEWS ==============
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String?
+  orderId   String   @unique
+  rating    Int      @default(5)
+  comment   String?
+  images    String[] @default([])
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id])
+
+  @@map("reviews")
+}
+
+// ============== REFERRALS ==============
+model Referral {
+  id          String   @id @default(cuid())
+  referrerId  String
+  referredId  String   @unique
+  code        String
+  status      ReferralStatus @default(PENDING)
+  rewardAmount Float   @default(100)
+  rewardedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  referrer    User     @relation("Referrer", fields: [referrerId], references: [id])
+  referred    User     @relation("Referred", fields: [referredId], references: [id])
+
+  @@map("referrals")
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  REWARDED
+  EXPIRED
+}
+
+// ============== LOYALTY ==============
+model LoyaltyPoint {
+  id          String   @id @default(cuid())
+  userId      String
+  points      Int
+  type        PointType
+  description String?
+  orderId     String?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_points")
+}
+
+enum PointType {
+  EARNED
+  REDEEMED
+  BONUS
+  EXPIRED
+}
+
+// ============== SUBSCRIPTIONS ==============
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  productId   String
+  plan        SubscriptionPlan
+  frequency   String   // "weekly", "biweekly", "monthly"
+  quantity    Int      @default(1)
+  price       Float
+  nextDelivery DateTime
+  status      SubscriptionStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+// ============== PROMOTIONS ==============
+model PromoCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  type        PromoType
+  value       Float
+  minOrder    Float?    @default(0)
+  maxDiscount Float?
+  usageLimit  Int?
+  usageCount  Int       @default(0)
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(true)
+  applicableTo String[] @default([]) // product categories
+  createdAt   DateTime  @default(now())
+
+  @@map("promo_codes")
+}
+
+enum PromoType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_DELIVERY
+  BUY_ONE_GET_ONE
+}
+
+// ============== DELIVERY ZONES ==============
+model DeliveryZone {
+  id          String   @id @default(cuid())
+  name        String
+  county      String
+  areas       String[]
+  baseFee     Float    @default(50)
+  perKmFee    Float    @default(20)
+  minOrder    Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("delivery_zones")
+}
+
+// ============== NOTIFICATIONS ==============
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  DELIVERY_ASSIGNED
+  DELIVERY_NEARBY
+  DELIVERY_COMPLETED
+  PROMOTION
+  REFERRAL_REWARD
+  SUBSCRIPTION_REMINDER
+  SYSTEM
+}
+
+// ============== ADMIN ==============
+model AdminProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  department  String?
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
+}
+
+// ============== CHATBOT ==============
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      ChatRole
+  message   String
+  intent    String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+// ============== BANNERS/CMS ==============
+model Banner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  image       String
+  link        String?
+  position    String   @default("home_top")
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("banners")
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  type      String   @default("info") // info, warning, success
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("announcements")
+}
