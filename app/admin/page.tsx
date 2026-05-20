@@ -8,8 +8,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Star, Clock,
   MapPin, Bell, Search, Filter, ChevronDown, MoreVertical,
   Download, Calendar, ArrowUpRight, ArrowDownRight,
-  BarChart3, PieChart, Activity, Zap, AlertTriangle,
- Check
+  BarChart3, PieChart, Activity, Zap, AlertTriangle, CheckCircle
 } from "lucide-react";
 
 // Recharts would be used here in production - simulating with CSS charts
@@ -414,7 +413,7 @@ export default function AdminDashboardPage() {
                 >
                   {alert.type === "warning" ? <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" /> :
                    alert.type === "info" ? <Bell className="w-5 h-5 text-blue-600 mt-0.5" /> :
-                   <Check className="w-5 h-5 text-green-600 mt-0.5" />}
+                   <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />}
                   <div className="flex-1">
                     <p className="text-sm">{alert.message}</p>
                     <p className="text-xs text-gray-500 mt-1">{alert.time}</p>

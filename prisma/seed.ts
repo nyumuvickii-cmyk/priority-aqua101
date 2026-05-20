@@ -492,7 +492,7 @@ async function main() {
         orderNumber: 'PA-001-2024',
         userId: customers[0].id,
         addressId: (await prisma.address.findFirst({ where: { userId: customers[0].id } }))!.id,
-        driverId: drivers[0].driverProfile!.id,
+        driverId: (await prisma.driverProfile.findFirst({ where: { userId: drivers[0].id } }))!.id,
         status: 'DELIVERED',
         paymentStatus: 'COMPLETED',
         paymentMethod: 'MPESA',

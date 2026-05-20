@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -23,6 +23,7 @@ import {
   X,
   Sun,
   Moon,
+  Shield,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 

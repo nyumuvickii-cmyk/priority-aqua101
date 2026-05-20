@@ -198,7 +198,6 @@ export const swahiliTranslations: Record<string, string> = {
   'Reports': 'Ripoti',
   'Customers': 'Wateja',
   'Drivers': 'Wasilishaji',
-  'Products': 'Bidhaa',
   'Inventory': 'Hesabu ya Bidhaa',
   'Sales': 'Mauzo',
   'Revenue': 'Mapato',
