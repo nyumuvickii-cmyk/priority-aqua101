@@ -8,8 +8,9 @@ import {
   DollarSign, TrendingUp, TrendingDown, Star, Clock,
   MapPin, Bell, Search, Filter, ChevronDown, MoreVertical,
   Download, Calendar, ArrowUpRight, ArrowDownRight,
-  BarChart3, PieChart, Activity, Zap, AlertTriangle
-, Check} from "lucide-react";
+  BarChart3, PieChart, Activity, Zap, AlertTriangle,
+ Check
+} from "lucide-react";
 
 // Recharts would be used here in production - simulating with CSS charts
 const salesData = [
