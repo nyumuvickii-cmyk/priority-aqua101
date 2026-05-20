@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowLeft, Gift, Share2, Copy, Check, Users, Star,
-  TrendingUp, MessageCircle, WhatsApp, Facebook, Twitter
+  TrendingUp, MessageCircle, Facebook, Twitter
 } from "lucide-react";
 
 export default function ReferralsPage() {
@@ -36,7 +36,7 @@ export default function ReferralsPage() {
 
   const shareOptions = [
     { icon: <MessageCircle className="w-5 h-5" />, label: "SMS", color: "bg-green-500" },
-    { icon: <WhatsApp className="w-5 h-5" />, label: "WhatsApp", color: "bg-green-600" },
+    { icon: <MessageCircle className="w-5 h-5" />, label: "WhatsApp", color: "bg-green-600" },
     { icon: <Facebook className="w-5 h-5" />, label: "Facebook", color: "bg-blue-600" },
     { icon: <Twitter className="w-5 h-5" />, label: "Twitter", color: "bg-sky-500" },
   ];

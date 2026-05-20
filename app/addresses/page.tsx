@@ -69,8 +69,8 @@ export default function AddressesPage() {
       setEditingId(null);
     } else {
       const newAddress: Address = {
-        id: Date.now().toString(),
         ...formData as Address,
+        id: Date.now().toString(),
         isDefault: addresses.length === 0,
       };
       setAddresses(prev => [...prev, newAddress]);
