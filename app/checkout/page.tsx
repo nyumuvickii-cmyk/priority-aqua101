@@ -35,12 +35,45 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     setPaymentStatus("processing");
 
-    // Simulate M-Pesa STK Push
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Simulate payment delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    setPaymentStatus("success");
-    setIsProcessing(false);
-    setShowConfirmation(true);
+    // Build order payload (replace with real cart/address/user data in production)
+    const payload = {
+      items: orderSummary.items.map(item => ({
+        productName: item.name, // Ideally use productId
+        quantity: item.qty,
+        price: item.price,
+      })),
+      subtotal: orderSummary.subtotal,
+      depositTotal: orderSummary.deposit,
+      deliveryFee: orderSummary.deliveryFee,
+      discount: orderSummary.discount,
+      total: orderSummary.total,
+      paymentMethod: paymentMethod.toUpperCase(),
+      paymentStatus: "COMPLETED",
+      deliveryType: "STANDARD",
+      status: "PENDING",
+      // Hardcoded address/user for demo; replace with real selection
+      userId: "demo-user-id",
+      addressId: "demo-address-id",
+    };
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Order creation failed");
+      setPaymentStatus("success");
+      setShowConfirmation(true);
+    } catch (err) {
+      setPaymentStatus("failed");
+      alert("Order could not be created. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (showConfirmation) {
