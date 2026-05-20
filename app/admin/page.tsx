@@ -9,7 +9,7 @@ import {
   MapPin, Bell, Search, Filter, ChevronDown, MoreVertical,
   Download, Calendar, ArrowUpRight, ArrowDownRight,
   BarChart3, PieChart, Activity, Zap, AlertTriangle
-} from "lucide-react";
+, Check} from "lucide-react";
 
 // Recharts would be used here in production - simulating with CSS charts
 const salesData = [
